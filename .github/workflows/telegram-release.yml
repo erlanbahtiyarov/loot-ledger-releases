@@ -1,0 +1,47 @@
+name: Telegram release notification
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      test_only:
+        description: Send a clearly marked test message
+        type: boolean
+        default: true
+      release_tag:
+        description: Release tag to announce (required when test_only is false)
+        type: string
+        default: ''
+
+permissions:
+  contents: read
+
+concurrency:
+  group: telegram-${{ github.event.release.id || github.run_id }}
+  cancel-in-progress: false
+
+jobs:
+  notify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      # Bot code lives on the default branch, even for tags created before setup.
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Send release announcement
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          TELEGRAM_THREAD_ID: ${{ vars.TELEGRAM_THREAD_ID }}
+          APP_NAME: Loot Ledger
+          GITHUB_TOKEN: ${{ github.token }}
+          TEST_ONLY: ${{ inputs.test_only }}
+          RELEASE_TAG: ${{ inputs.release_tag }}
+          INCLUDE_PRERELEASES: ${{ vars.INCLUDE_PRERELEASES }}
+        run: node telegram-bot/notify.mjs
